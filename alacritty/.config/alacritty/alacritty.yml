@@ -1,0 +1,135 @@
+# Configuration for Alacritty, the GPU enhanced terminal emulator.
+
+env:
+  TERM: xterm-256color
+
+window:
+  padding:
+    x: 2
+    y: 2
+
+  # Allow terminal applications to change Alacritty's window title.
+  dynamic_title: true
+
+scrolling:
+  # Maximum number of lines in the scrollback buffer.
+  history: 10000
+  # Scrolling distance multiplier.
+  multiplier: 5
+
+# Font configuration
+font:
+  normal:
+    # Font family
+    family: 'DejaVuSansMono Nerd Font Mono'
+
+  # Point size
+  size: 12.0
+
+# Colors: Monokai, copied from https://github.com/oneKelvinSmith/monokai-emacs/blob/master/monokai-theme.el
+colors:
+  # Default colors
+  primary:
+    background: '#272822'
+    foreground: '#F8F8F2'
+
+  cursor:
+    text: CellBackground
+    cursor: '#F8F8F2'
+
+  # Search colors
+  #
+  # Colors used for the search bar and match highlighting.
+  search:
+    matches:
+      foreground: CellForeground
+      background: '#BBEF53'
+    focused_match:
+      foreground: CellBackground
+      background: '#86C30D'
+
+    bar:
+      background: '#3C3D37'
+      foreground: '#F8F8F2'
+
+  line_indicator:
+    foreground: '#8F908A'
+    background: '#272822'
+
+  # Selection colors
+  #
+  # Colors which should be used to draw the selection area.
+  selection:
+    text: CellForeground
+    background: '#49483E'
+
+  # Normal colors
+  normal:
+    black:   '#272822'
+    red:     '#F92672'
+    green:   '#A6E22E'
+    yellow:  '#FD971F' # orange
+    blue:    '#66D9EF'
+    magenta: '#FD5FF0'
+    cyan:    '#A1EFE4'
+    white:   '#8F908A' #'#F8F8F2'
+
+  # Bright colors
+  bright:
+    black:   '#75715E'
+    red:     '#FA518D'
+    green:   '#BBEF53'
+    yellow:  '#FFAC4A' # orange
+    blue:    '#92E7F7'
+    magenta: '#FE8CF4'
+    cyan:    '#D3FBF6'
+    white:   '#F9F8F5'
+
+  # Dim colors
+  dim:
+    red:     '#F70057'
+    green:   '#86C30D'
+    yellow:  '#D47402' # orange
+    blue:    '#40CAE4'
+    magenta: '#FB35EA'
+    cyan:    '#74DBCD'
+    white:   '#75715E'
+
+background_opacity: 1.0
+
+cursor:
+  style:
+    shape: Block
+    blinking: On
+
+  blink_interval: 500
+
+shell:
+  program: /usr/bin/zsh
+  args:
+    - --login
+
+mouse:
+  hide_when_typing: true
+
+key_bindings:
+  # some emacs key bindings
+  - { key: S, mods: Control, mode: ~Alt|~Search, action: SearchForward }
+  - { key: S, mods: Control, mode: ~Alt|Search, action: SearchFocusNext }
+  - { key: R, mods: Control, mode: ~Alt|Search, action: SearchFocusPrevious }
+  - { key: G, mods: Control, mode: ~Alt|Search, action: SearchCancel }
+  - { key: W, mods: Alt, mode: ~Alt, action: Copy }
+  - { key: Y, mods: Control, mode: ~Alt, action: Paste }
+
+  - { key: F11, action: ToggleFullScreen }
+  - { key: N, mods: Control|Shift, mode: ~Alt, action: SpawnNewInstance }
+
+hints:
+  enabled:
+    - regex: "(mailto:|gemini:|gopher:|https:|http:|news:|file:|git:|ssh:|ftp:)\
+              [^\u0000-\u001F\u007F-\u009F<>\"\\s{-}\\^⟨⟩`]+"
+      command: xdg-open
+      post_processing: true
+      mouse:
+        enabled: true
+        mods: None
