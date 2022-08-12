@@ -5,7 +5,7 @@
 ;;; increase gc threshold
 (setq gc-cons-threshold 10000000)
 ;;; garbage collect when losing focus or after being idle for 5s
-(add-hook 'focus-out-hook 'garbage-collect)
+(add-function :after after-focus-change-function (lambda () (unless (frame-focus-state) (garbage-collect))))
 (run-with-idle-timer 5 t 'garbage-collect)
 
 ;;; make the custom file a temp file so that customizationsa are only temporary
@@ -18,8 +18,9 @@
 (setq uniquify-buffer-name-style 'forward)
 
 ;;; only ask y or n, not yes or no
-(defalias 'yes-or-no-p 'y-or-n-p)
+(setq use-short-answers t)
 
+;; melpa
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
@@ -57,8 +58,14 @@
 (when (eq system-type 'darwin)
   (setq ns-right-alternate-modifier 'none))
 
-;;; wrap lines in programming modes
-(global-visual-line-mode 1)
+;;; move on logical lines instead of visual lines (except for text-mode, see below)
+(require 'simple)
+(setq line-move-visual nil)
+
+;;; wrap lines nicely in text modes and move on visual lines
+(add-hook 'text-mode-hook (lambda ()
+                            (visual-line-mode 1)
+                            (setq-local line-move-visual t)))
 
 ;;; fill-column
 (setq-default fill-column 120)
@@ -80,11 +87,17 @@
 (require 'whitespace)
 (setq whitespace-line-column fill-column)
 (setq whitespace-style '(face trailing tabs lines-tail empty))
-(add-hook 'prog-mode 'whitespace-mode)
+(add-hook 'prog-mode-hook 'whitespace-mode)
 
 ;;; set font
-;(add-to-list 'default-frame-alist '(font . "DejaVuSansMono Nerd Font Mono-12"))
-(add-to-list 'default-frame-alist '(font . "DejaVuSansMono Nerd Font Mono-9"))
+(add-to-list 'default-frame-alist '(font . "DejaVuSansMono Nerd Font Mono-12"))
+;(add-to-list 'default-frame-alist '(font . "DejaVuSansMono Nerd Font Mono-9"))
+
+(require 're-builder)
+(setq reb-re-syntax 'string)
+
+(require 'vc-hooks)
+(setq vc-follow-symlinks t)
 
 (use-package monokai-theme
   :config
@@ -193,7 +206,7 @@ If it is a file print the relative path inside the projectile project or its com
   :custom
   (dashboard-startup-banner 'logo)
   (dashboard-projects-backend 'projectile)
-  (dashboard-items '((recents . 5)
+  (dashboard-items '((recents . 10)
                      (projects . 5)
                      (agenda . 5)))
   :config
@@ -247,7 +260,7 @@ If it is a file print the relative path inside the projectile project or its com
   :bind (("C-s" . swiper-isearch)
          ("C-r" . swiper-isearch-backward)))
 
-;;; highlight TODO, FIXME, ...
+;;; highlight TODO, FIXME, ... (in programming modes)
 (use-package hl-todo
   :hook (prog-mode . hl-todo-mode))
 
@@ -293,9 +306,20 @@ point reaches the beginning or end of the buffer, stop there."
 
 (require 'dired)
 ;;; don't create a new buffer when pressing RET (or e or f)
-(define-key dired-mode-map [remap dired-find-file] 'dired-find-alternate-file)
+(setq dired-kill-when-opening-new-dired-buffer t)
 ;;; automatically revert dired buffers
 (setq dired-auto-revert-buffer t)
+;;; enable enter key
+(put 'dired-find-alternate-file 'disabled nil)
+
+(use-package vterm
+  :commands (vterm)
+  :bind ("C-x t" . vterm)
+  ;; disable line highlight: https://github.com/akermu/emacs-libvterm/issues/432#issuecomment-894230991
+  :hook ((vterm-mode . (lambda () (setq-local global-hl-line-mode nil)))
+         (vterm-copy-mode . (lambda () (hl-line-mode 'toggle))))
+  :custom (vterm-buffer-name-string "vterm: %s")
+  :config (set-face-attribute 'vterm-color-yellow nil :foreground "dark orange" :background "orange"))
 
 ;;; pdf-tools
 ;;; https://emacs.stackexchange.com/questions/13314/install-pdf-tools-on-emacs-macosx
@@ -316,7 +340,6 @@ point reaches the beginning or end of the buffer, stop there."
 
 ;;; magit
 (use-package magit
-  :custom (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1)
   :bind (("C-x g" . magit-status)
          ("C-c g" . magit-file-dispatch)))
 
@@ -328,39 +351,31 @@ point reaches the beginning or end of the buffer, stop there."
   :custom
   (projectile-completion-system 'ivy "Use ivy for projectile completions")
   (projectile-enable-caching t "Enable caching for better performance")
+  (projectile-indexing-method 'hybrid)
   :config
   (setq projectile-globally-ignored-directories (cons "build" projectile-globally-ignored-directories)))
 
-;;; lsp
-(use-package lsp-mode
-  :commands (lsp lsp-format-buffer)
-  :hook
-  (rustic-mode . lsp)
-  (lsp-mode . lsp-enable-which-key-integration)
-  :custom (lsp-keymap-prefix "C-c l"))
+;;; eglot (lsp)
+(use-package eglot)
 
-(use-package lsp-ui
-  :commands (lsp-ui-mode lsp-ui-peek-find-definitions lsp-ui-peek-find-references lsp-ui-imenu)
-  :bind (([remap xref-find-definitions] . #'lsp-ui-peek-find-definitions)
-         ([remap xref-find-references] . #'lsp-ui-peek-find-references)
-         ("M--" . #'lsp-ui-imenu))
-  :custom
-  (lsp-ui-doc-delay 2 "Wait 2s before showing doc")
-  (lsp-ui-peek-always-show t "Always show peek window, also if only 1 reference")
-  (lsp-ui-sideline-enable nil))
+(define-key eglot-mode-map (kbd "C-c l n") #'flymake-goto-next-error)
+(define-key eglot-mode-map (kbd "C-c l p") #'flymake-goto-prev-error)
+(define-key eglot-mode-map (kbd "C-c l r") #'eglot-rename)
+(define-key eglot-mode-map (kbd "C-c l f") #'eglot-format)
+(define-key eglot-mode-map (kbd "C-c l a") #'eglot-code-actions)
 
-(use-package lsp-ivy :commands lsp-ivy-workspace-symbol)
+(require 'eldoc)
+(setq eldoc-echo-area-prefer-doc-buffer t)
+(setq eldoc-echo-area-use-multiline-p 5)
+(setq eldoc-echo-area-display-truncation-message nil)
 
-(use-package company
-  :hook (prog-mode . company-mode))
-
-;;; flycheck
-(use-package flycheck
-  :hook (prog-mode . flycheck-mode))
-
-;;; yasnippet (needed for lsp completions)
+;;; yasnippet (for completions)
 (use-package yasnippet
   :hook (prog-mode . yas-minor-mode))
+
+;;; completions
+(use-package company
+  :hook (prog-mode . company-mode))
 
 ;; language specific
 
@@ -403,10 +418,9 @@ point reaches the beginning or end of the buffer, stop there."
 ;;; rust
 (use-package rustic
   :config (add-hook 'before-save-hook (lambda () (when (eq major-mode 'rustic-mode)
-                                                   (lsp-format-buffer))))
+                                                   (eglot-format-buffer))))
   :custom
-  (rustic-lsp-format t "Let lsp do the formatting")
-  (lsp-rust-analyzer-cargo-watch-command "clippy" "Use clippy instead of cargo check"))
+  (rustic-lsp-client 'eglot))
 
 (use-package yaml-mode
   :mode "\\.yml\\'")
@@ -422,6 +436,7 @@ point reaches the beginning or end of the buffer, stop there."
  'org-babel-load-languages
  '((C . t)
    (emacs-lisp . t)
+   (latex . t)
    (python . t)
    (screen . t)
    (shell . t)))
@@ -436,7 +451,12 @@ point reaches the beginning or end of the buffer, stop there."
 (setq org-latex-caption-above nil) ; place caption below every element
 (setq org-image-actual-width 600) ; width of inline images in px
 
+;;; org-roam
+(use-package org-roam
+  :custom (org-roam-directory "~/org-roam")
+  :bind (("C-c n f" . org-roam-node-find)
+         ("C-c n i" . org-roam-node-insert))
+  :config (org-roam-db-autosync-mode))
+
 (provide 'init)
 ;;; init.el ends here
-(put 'upcase-region 'disabled nil)
-(put 'dired-find-alternate-file 'disabled nil)

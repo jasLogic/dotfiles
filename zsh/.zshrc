@@ -55,12 +55,9 @@ alias free='free -m' # Show sizes in MB
 if [ -r /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]; then
     source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
-# Use history substring search
-if [ -r /usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh ]; then
-    source /usr/share/zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh
-    # bind UP and DOWN arrow keys to history substring search
-    bindkey "^[[A" history-substring-search-up
-    bindkey "^[[B" history-substring-search-down
+# fzf history search
+if [ -r /usr/share/fzf/key-bindings.zsh ]; then
+    source /usr/share/fzf/key-bindings.zsh
 fi
 
 # keybindings
@@ -153,6 +150,11 @@ git_prompt_string() {
 
 #  branch:+ahead:-behind [status]
 RPROMPT='$(git_prompt_string)'
+
+# for emacs vterm: https://github.com/akermu/emacs-libvterm#shell-side-configuration-files=
+if [[ "$INSIDE_EMACS" = 'vterm' ]] && [ -r "$EMACS_VTERM_PATH/etc/emacs-vterm-zsh.sh" ]; then
+    source $EMACS_VTERM_PATH/etc/emacs-vterm-zsh.sh
+fi
 
 # Color man pages
 export LESS_TERMCAP_mb=$'\E[01;32m'
