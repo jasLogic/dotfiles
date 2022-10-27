@@ -321,6 +321,9 @@ point reaches the beginning or end of the buffer, stop there."
   :custom (vterm-buffer-name-string "vterm: %s")
   :config (set-face-attribute 'vterm-color-yellow nil :foreground "dark orange" :background "orange"))
 
+(use-package tex
+  :ensure auctex)
+
 ;;; pdf-tools
 ;;; https://emacs.stackexchange.com/questions/13314/install-pdf-tools-on-emacs-macosx
 (use-package pdf-tools
@@ -429,6 +432,7 @@ point reaches the beginning or end of the buffer, stop there."
 (require 'org)
 
 (setq org-ellipsis " ▾")
+(plist-put org-format-latex-options :scale 2.0)
 
 (require 'ox-latex)
 
@@ -443,9 +447,12 @@ point reaches the beginning or end of the buffer, stop there."
 
 (setq org-latex-packages-alist
       '(("AUTO" "babel" nil) ; automatically use correct language in export
-        ("per-mode=fraction" "siunitx" t))) ; scientific units
+        ("per-mode=fraction" "siunitx" t) ; scientific units
+        ;("" "braket" t)
+        ("" "physics" t)))
 
 (setq org-startup-with-inline-images t)
+(setq org-startup-with-latex-preview t)
 (add-hook 'org-babel-after-execute-hook 'org-redisplay-inline-images) ; redisplay images after running
 (setq org-confirm-babel-evaluate nil) ; don't ask before evaluating a code block
 (setq org-latex-caption-above nil) ; place caption below every element
