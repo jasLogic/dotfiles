@@ -47,6 +47,7 @@ alias grep='grep --color=auto'
 # confirm before overwriting
 alias cp='cp -i'
 alias mv='mv -i'
+alias rm='rm -I' # prompt before removing more than 3 files or recursively
 alias df='df -h' # Human-readable sizes
 alias free='free -m' # Show sizes in MB
 
