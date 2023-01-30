@@ -4,18 +4,12 @@
 (add-function :after after-focus-change-function (lambda () (unless (frame-focus-state) (garbage-collect))))
 (run-with-idle-timer 5 t 'garbage-collect)
 
-;;; make the custom file a temp file so that customizationsa are only temporary
-(setq custom-file (make-temp-file "emacs-custom-file"))
-
 ;;; focus help window when opened
 (setq help-window-select t)
 
 ;;; uniquify buffer names like file system paths
 ;;; TODO:
 (setq uniquify-buffer-name-style 'forward)
-
-;;; only ask y or n, not yes or no
-(setq use-short-answers t)
 
 ;;; don't show startup screen
 (setq inhibit-startup-message t)
@@ -58,20 +52,32 @@
 (use-package emacs
   :straight (:type built-in)
   :custom
+  (custom-file (make-temp-file "emacs-custom-file")) ; make customizations temporary
   (fill-column 120)
   (indent-tabs-mode nil) ; don't use tabs to indent
   (tab-width 4)
   (minibuffer-prompt-properties ; do not allow the cursor in the minibuffer prompt
    '(read-only t cursor-intangible t face minibuffer-prompt))
+  ;;(native-comp-async-report-warnings-errors 'silent)
+  (sentence-end-double-space nil)
+  (use-short-answers t) ; only ask y or n, not yes or no
+  (user-full-name "Jaslo Ziska")
+  (user-mail-address "jaslo@jaslogic.tech")
+  (warning-minimum-level :error)
   :config
   (add-hook #'before-save-hook #'delete-trailing-whitespace) ; delete trailing whitespace on save
   (add-hook #'minibuffer-setup-hook #'cursor-intangible-mode) ; keep cursor out of cursor-intangible areas
   (global-display-line-numbers-mode 1))
 
 ;;; built-in packages:
+(use-package calendar
+  :straight (:type built-in)
+  :config (calendar-set-date-style 'european))
+
 (use-package dired
   :straight (:type built-in)
   :custom
+  (dired-listing-switches "-l --almost-all --human-readable --si --group-directories-first")
   (dired-auto-revert-buffer t)
   (dired-kill-when-opening-new-dired-buffer t))
 
@@ -85,6 +91,14 @@
   :straight (:type built-in)
   :init (global-hl-line-mode 1))
 
+(use-package image
+  :straight (:type built-in)
+  :init (add-hook 'image-mode-hook (lambda ()
+                                     (auto-revert-mode 1)
+                                     (display-line-numbers-mode -1) ; no line numbers
+                                     (blink-cursor-mode -1))) ; disable cursor blinking
+  :custom (image-use-external-converter t))
+
 (use-package re-builder
   :straight (:type built-in)
   :commands re-builder
@@ -95,10 +109,10 @@
   :straight (:type built-in)
   :init (savehist-mode))
 
-;;; move on logical lines instead of visual lines (except for text-mode, see below)
 (use-package simple
   :straight (:type built-in)
-  :custom (line-move-visual nil))
+  :custom (line-move-visual nil) ; move on logical lines instead of visual lines (except for text-mode, see below)
+  :config (column-number-mode))
 
 ;;; wrap lines nicely in text modes and move on visual lines
 (use-package text-mode
@@ -110,7 +124,9 @@
 
 (use-package tramp
   :straight (:type built-in)
-  :custom (tramp-default-method "ssh"))
+  :custom
+  (tramp-default-method "ssh")
+  :config (setq tramp-terminal-type "dump")) ; I don't know why but I need to set it to this value, otherwise it does not work...
 
 (use-package vc-hooks
   :straight (:type built-in)
@@ -124,13 +140,26 @@
   (whitespace-line-column fill-column)
   (whitespace-style '(face trailing tabs lines-trail empty)))
 
+(use-package windmove
+  :straight (:type built-in)
+  :commands (windmove-left windmove-down windmove-up windmove-right)
+  :init (defvar-keymap windmove-hjkl-map)
+  :bind (:map windmove-hjkl-map
+              ("h" . windmove-left)
+              ("j" . windmove-down)
+              ("k" . windmove-up)
+              ("l" . windmove-right)))
+
 ;;; external non-prog-mode packages:
 (use-package all-the-icons)
+(use-package all-the-icons-dired
+  :hook dired-mode)
 
 (use-package consult
   :bind (("C-x b" . consult-buffer)
          ("C-s" . consult-line)
          ("C-c g" . consult-ripgrep)
+         ("C-c m" . consult-man)
          :map project-prefix-map
          ("b" . consult-project-buffer)
          :map goto-map
@@ -139,7 +168,9 @@
 (use-package corfu
   :init (global-corfu-mode 1)
   :bind (:map corfu-map
-              ("SPC" . corfu-insert-separator))
+              ("SPC" . corfu-insert-separator)
+              ("C-j" . corfu-next)
+              ("C-k" . corfu-previous))
   :custom
   (corfu-auto t)
   (corfu-auto-delay 1)
@@ -154,6 +185,8 @@
       (setq-local corfu-echo-documentation nil))) ; don't show doc while we are typing there
   (add-hook 'minibuffer-setup-hook #'corfu-enable-always-in-minibuffer 1))
 
+(use-package dwim-shell-command)
+
 (use-package eglot
   :commands eglot
   :bind (("C-c l n" . flymake-goto-next-error)
@@ -162,22 +195,10 @@
          ("C-c l f" . eglot-format)
          ("C-c l a" . eglot-code-actions)))
 
-(use-package evil
-  :init
-  (setq evil-want-keybinding nil)
-  (evil-mode 1)
-  :config (evil-set-initial-state 'vterm-mode 'emacs)
-  :custom
-  (evil-cross-lines t)
-  (evil-move-beyond-eol t)
-  (evil-respect-visual-line-mode t)
-  (evil-undo-system 'undo-redo))
-
-(use-package evil-collection
-  :after evil
-  :config
-  (setq evil-collection-mode-list '(corfu dired magit org))
-  (evil-collection-init))
+;;; fix $PATH env variable on mac
+(use-package exec-path-from-shell
+  :if (eq system-type 'darwin)
+  :config (exec-path-from-shell-initialize))
 
 ;;; highlight TODO, FIXME, ... (in programming modes)
 (use-package hl-todo
@@ -196,8 +217,115 @@
   :bind (("C-x g" . magit-status)
          ("C-c g" . magit-file-dispatch)))
 
+(use-package meow
+  :custom
+  (meow-cheatsheet-layout meow-cheatsheet-layout-qwerty)
+  (meow-goto-line-function #'consult-goto-line)
+  (meow-use-clipboard t)
+  (meow-use-cursor-position-hack t)
+  :config
+  (when (not (assoc ?a meow-char-thing-table))
+    (push '(?a . angle) meow-char-thing-table))
+  (meow-thing-register 'angle '(pair ("<") (">")) '(pair ("<") (">")))
+  (meow-motion-overwrite-define-key
+   '("j" . meow-next)
+   '("k" . meow-prev)
+   '("<escape>" . ignore))
+  (meow-leader-define-key
+   ;; SPC j/k will run the original command in MOTION state.
+   '("j" . "H-j")
+   '("k" . "H-k")
+   ;; Use SPC (0-9) for digit arguments.
+   '("1" . meow-digit-argument)
+   '("2" . meow-digit-argument)
+   '("3" . meow-digit-argument)
+   '("4" . meow-digit-argument)
+   '("5" . meow-digit-argument)
+   '("6" . meow-digit-argument)
+   '("7" . meow-digit-argument)
+   '("8" . meow-digit-argument)
+   '("9" . meow-digit-argument)
+   '("0" . meow-digit-argument)
+   '("/" . meow-keypad-describe-key)
+   '("?" . meow-cheatsheet)
+   (cons "p" project-prefix-map)
+   '("v" . magit-status)
+   '("V" . magit-file-dispatch)
+   (cons "w" windmove-hjkl-map))
+  (meow-normal-define-key
+   '("0" . meow-expand-0)
+   '("9" . meow-expand-9)
+   '("8" . meow-expand-8)
+   '("7" . meow-expand-7)
+   '("6" . meow-expand-6)
+   '("5" . meow-expand-5)
+   '("4" . meow-expand-4)
+   '("3" . meow-expand-3)
+   '("2" . meow-expand-2)
+   '("1" . meow-expand-1)
+   '("=" . meow-indent)
+   '("-" . negative-argument)
+   '(";" . meow-reverse)
+   '("," . meow-inner-of-thing)
+   '("." . meow-bounds-of-thing)
+   '("[" . meow-beginning-of-thing)
+   '("]" . meow-end-of-thing)
+   '("a" . meow-append)
+   '("A" . (lambda () (interactive) (move-end-of-line nil) (meow-insert)))
+   '("b" . meow-back-word)
+   '("B" . meow-back-symbol)
+   '("c" . meow-change)
+   '("d" . (lambda () (interactive) (if (region-active-p) (meow-kill) (meow-delete))))
+   '("D" . meow-backward-delete)
+   '("e" . meow-next-word)
+   '("E" . meow-next-symbol)
+   '("f" . meow-find)
+   '("g" . meow-cancel-selection)
+   '("G" . meow-grab)
+   '("h" . meow-left)
+   '("H" . meow-left-expand)
+   '("i" . meow-insert)
+   '("I" . (lambda () (interactive) (back-to-indentation) (meow-insert)))
+   '("j" . meow-next)
+   '("J" . meow-next-expand)
+   '("k" . meow-prev)
+   '("K" . meow-prev-expand)
+   '("l" . meow-right)
+   '("L" . meow-right-expand)
+   '("m" . meow-join)
+   '("n" . meow-search)
+   '("o" . meow-open-below)
+   '("O" . meow-open-above)
+   '("p" . meow-yank)
+   '("P" . meow-yank-pop)
+   '("q" . meow-quit)
+   '("Q" . meow-goto-line)
+   '("r" . meow-replace)
+   '("R" . meow-swap-grab)
+   '("s" . meow-block)
+   '("S" . meow-to-block)
+   '("t" . meow-till)
+   '("u" . meow-undo)
+   '("U" . meow-undo-in-selection)
+   '("v" . meow-visit)
+   '("w" . meow-mark-word)
+   '("W" . meow-mark-symbol)
+   '("x" . meow-line)
+   '("X" . meow-goto-line)
+   '("y" . meow-save)
+   '("Y" . meow-sync-grab)
+   '("z" . meow-pop-selection)
+   '("'" . repeat)
+   '("<escape>" . ignore))
+  (meow-global-mode 1))
+
 (use-package moe-theme
   :config (load-theme 'moe-dark t))
+
+(use-package multi-vterm
+  :after vterm
+  :commands multi-vterm
+  :bind ("C-x t" . multi-vterm))
 
 (use-package no-littering
   :config
@@ -212,23 +340,24 @@
   (when (eq system-type 'darwin)
     (setq pdf-tools-handle-upgrades nil)
     (setq pdf-info-epdfinfo-program "/usr/local/bin/epdfinfo"))
-  (add-hook 'pdf-view-mode-hook (lambda () (display-line-numbers-mode -1))) ; no line numbers
+  (add-hook 'pdf-view-mode-hook (lambda ()
+                                  (display-line-numbers-mode -1) ; no line numbers
+                                  (blink-cursor-mode -1))) ; disable cursor blinking
   (pdf-tools-install :no-query)
   :bind (:map pdf-view-mode-map ("C-s" . isearch-forward))) ; use pdf-tool specific search
 
-;;; fix $PATH env variable on mac
-(use-package exec-path-from-shell
-  :if (eq system-type 'darwin)
-  :config (exec-path-from-shell-initialize))
+(use-package rainbow-delimiters
+  :hook prog-mode)
 
 (use-package vterm
-  :commands vterm
-  :bind ("C-x t" . vterm)
   ;; disable line highlight: https://github.com/akermu/emacs-libvterm/issues/432#issuecomment-894230991
   :hook ((vterm-mode . (lambda () (setq-local global-hl-line-mode nil)))
          (vterm-copy-mode . (lambda () (hl-line-mode 'toggle))))
   :custom (vterm-buffer-name-string "vterm: %s")
   :config (set-face-attribute 'vterm-color-yellow nil :foreground "dark orange" :background "orange"))
+
+(use-package which-key
+  :hook (after-init . which-key-mode))
 
 ;;; minibuffer:
 (use-package all-the-icons-completion
@@ -252,16 +381,24 @@
               ("S-C-K" . vertico-previous-group)
               ("C-j" . vertico-next)
               ("C-k" . vertico-previous)
-              ("DEL" . (lambda () ; delete the whole word when completing a filename and the last character is '/'
+              ("~" . (lambda ()
+                       (interactive)
+                       (beginning-of-line nil)
+                       (kill-line)
+                       (insert "~/")))
+              ("DEL" . (lambda () ; delete the whole directory when completing a filename and the last character is '/'
                          (interactive)
                          (if (and minibuffer-completing-file-name (eq ?/ (char-before (point))))
                              (progn ; TODO: error when // or at ~/
                                (delete-backward-char 1)
-                               (skip-chars-backward "^/")
-                               (kill-line))
+                               (unless (zerop (skip-chars-backward "^/"))
+                                 (kill-line)))
                            (delete-backward-char 1)))))
   :init (vertico-mode)
   :custom (vertico-cycle t))
+
+(use-package yasnippet
+  :hook ((latex-mode . yas-minor-mode)))
 
 ;; Enable recursive minibuffers
 (setq enable-recursive-minibuffers t)
@@ -282,11 +419,13 @@
   (add-hook 'org-babel-after-execute-hook 'org-redisplay-inline-images) ; redisplay images after running code
   :custom
   (org-confirm-babel-evaluate nil) ; don't ask before evaluating a code block
+  (org-edit-src-content-indentation 0)
   (org-ellipsis " ▾")
+  (org-fold-catch-invisible-edits 'show-and-error)
+  (org-image-actual-width 500)
   (org-startup-with-inline-images t)
   (org-startup-with-latex-preview t)
   ;; LaTeX
-  (org-latex-caption-above nil) ; place caption below every element
   (org-latex-packages-alist
    '(("AUTO" "babel" nil)
      ("per-mode=fraction" "siunitx" t) ; scientific units
@@ -311,3 +450,42 @@
   (org-roam-node-display-template
    (concat "${title:*} " (propertize "${tags:20}" 'face 'org-tag)))
   :config (org-roam-db-autosync-mode))
+
+(use-package htmlize)
+
+;;; language specific
+(use-package latex
+  :straight auctex
+  :mode "\\.tex\\'"
+  :custom
+  (TeX-auto-save t)
+  (TeX-engine 'xetex)
+  (TeX-master nil)
+  (TeX-parse-serf t)
+  :config
+  (setf (car (alist-get 'output-pdf TeX-view-program-selection)) "PDF Tools") ; use pdf-tools as pdf viewer
+  (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer)) ; revert pdf buffer when finished compiling
+
+(use-package cc-mode
+  :straight (:type built-in)
+  :custom
+  (c-basic-offset 4)
+  (c-backslash-column 79)
+  (c-backslash-max-column (1- fill-column)))
+
+(use-package cmake-mode)
+
+(use-package c++-mode
+  :straight (:type built-in)
+  :mode (rx ".cu" (opt "h") eos)) ; for CUDA
+
+(use-package dts-mode)
+
+(use-package lua-mode)
+
+(use-package pyvenv)
+
+(use-package rust-mode)
+
+(use-package yaml-mode
+  :mode (rx ".y" (opt "a") "ml" eos))
