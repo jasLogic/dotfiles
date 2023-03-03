@@ -70,6 +70,10 @@
   (global-display-line-numbers-mode 1))
 
 ;;; built-in packages:
+(use-package bibtex
+  :straight (:type built-in)
+  :custom (bibtex-align-at-equal-sign t))
+
 (use-package calendar
   :straight (:type built-in)
   :config (calendar-set-date-style 'european))
@@ -87,6 +91,11 @@
   (eldoc-echo-area-prefer-doc-buffer t)
   (eldoc-echo-area-use-multiline-p 5))
 
+(use-package flyspell
+  :custom-face
+  ;; make flyspell-incorrect face only underline in red (moe default is red background)
+  (flyspell-incorrect ((t (:foreground unspecified :background unspecified :underline "#ef2929")))))
+
 (use-package hl-line
   :straight (:type built-in)
   :init (global-hl-line-mode 1))
@@ -98,6 +107,11 @@
                                      (display-line-numbers-mode -1) ; no line numbers
                                      (blink-cursor-mode -1))) ; disable cursor blinking
   :custom (image-use-external-converter t))
+
+(use-package project
+  :straight (:type built-in)
+  :custom (project-vc-ignores '("./build/" "./target/" ".cache/"))
+  :config (add-to-list 'project-switch-commands '(magit-project-status "Magit" ?m)))
 
 (use-package re-builder
   :straight (:type built-in)
@@ -148,7 +162,10 @@
               ("h" . windmove-left)
               ("j" . windmove-down)
               ("k" . windmove-up)
-              ("l" . windmove-right)))
+              ("l" . windmove-right)
+              ("q" . delete-window)
+              ("v" . split-window-below)
+              ("s" . split-window-right)))
 
 ;;; external non-prog-mode packages:
 (use-package all-the-icons)
@@ -162,6 +179,7 @@
          ("C-c m" . consult-man)
          :map project-prefix-map
          ("b" . consult-project-buffer)
+         ("C-b" . consult-project-buffer)
          :map goto-map
          ("g" . consult-goto-line)))
 
@@ -189,6 +207,7 @@
 
 (use-package eglot
   :commands eglot
+  :hook (LaTeX-mode . eglot-ensure)
   :bind (("C-c l n" . flymake-goto-next-error)
          ("C-c l p" . flymake-goto-prev-error)
          ("C-c l r" . eglot-rename)
@@ -217,6 +236,14 @@
   :bind (("C-x g" . magit-status)
          ("C-c g" . magit-file-dispatch)))
 
+(use-package magit-todos
+  ;; fix meow not working inside magit (because of keymap property in magit-insert-section)
+  :bind (:map magit-todos-section-map
+         ("j" . nil)
+         :map magit-todos-item-section-map
+         ("j" . nil))
+  :config (magit-todos-mode))
+
 (use-package meow
   :custom
   (meow-cheatsheet-layout meow-cheatsheet-layout-qwerty)
@@ -227,6 +254,9 @@
   (when (not (assoc ?a meow-char-thing-table))
     (push '(?a . angle) meow-char-thing-table))
   (meow-thing-register 'angle '(pair ("<") (">")) '(pair ("<") (">")))
+  (when (not (assoc ?$ meow-char-thing-table))
+    (push '(?$ . dollar) meow-char-thing-table))
+  (meow-thing-register 'dollar '(regexp "\\$" "\\$") '(regexp "\\$" "\\$"))
   (meow-motion-overwrite-define-key
    '("j" . meow-next)
    '("k" . meow-prev)
@@ -248,6 +278,8 @@
    '("0" . meow-digit-argument)
    '("/" . meow-keypad-describe-key)
    '("?" . meow-cheatsheet)
+   '("b" . consult-buffer)
+   '("B" . list-buffers)
    (cons "p" project-prefix-map)
    '("v" . magit-status)
    '("V" . magit-file-dispatch)
@@ -266,6 +298,7 @@
    '("=" . meow-indent)
    '("-" . negative-argument)
    '(";" . meow-reverse)
+   '(":" . meow-goto-line)
    '("," . meow-inner-of-thing)
    '("." . meow-bounds-of-thing)
    '("[" . meow-beginning-of-thing)
@@ -297,9 +330,9 @@
    '("o" . meow-open-below)
    '("O" . meow-open-above)
    '("p" . meow-yank)
-   '("P" . meow-yank-pop)
-   '("q" . meow-quit)
-   '("Q" . meow-goto-line)
+   '("P" . consult-yank-from-kill-ring)
+   '("q" . quit-window)
+   '("Q" . kill-buffer)
    '("r" . meow-replace)
    '("R" . meow-swap-grab)
    '("s" . meow-block)
@@ -398,7 +431,7 @@
   :custom (vertico-cycle t))
 
 (use-package yasnippet
-  :hook ((latex-mode . yas-minor-mode)))
+  :hook ((LaTeX-mode . yas-minor-mode)))
 
 ;; Enable recursive minibuffers
 (setq enable-recursive-minibuffers t)
@@ -454,16 +487,21 @@
 (use-package htmlize)
 
 ;;; language specific
+; TODO: maybe with (use-package auctex :mode ((...) . TeX-latex-mode)) ??
 (use-package latex
   :straight auctex
-  :mode "\\.tex\\'"
+  :mode (rx ".tex" eos)
   :custom
   (TeX-auto-save t)
   (TeX-engine 'xetex)
   (TeX-master nil)
-  (TeX-parse-serf t)
+  (TeX-parse-self t)
+  (LaTeX-csquotes-open-quote "\\enquote{")
+  (LaTeX-csquotes-close-quote "}")
   :config
   (setf (car (alist-get 'output-pdf TeX-view-program-selection)) "PDF Tools") ; use pdf-tools as pdf viewer
+  (put 'LaTeX-mode 'flyspell-mode-predicate 'tex-mode-flyspell-verify) ; don't flyspell on LaTeX macros
+  (add-hook 'TeX-language-ngerman-hook (lambda () (ispell-change-dictionary "de_DE")))
   (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer)) ; revert pdf buffer when finished compiling
 
 (use-package cc-mode
@@ -479,9 +517,12 @@
   :straight (:type built-in)
   :mode (rx ".cu" (opt "h") eos)) ; for CUDA
 
+(use-package dockerfile-mode)
+
 (use-package dts-mode)
 
-(use-package lua-mode)
+(use-package lua-mode
+  :custom (lua-indent-level 4))
 
 (use-package pyvenv)
 
