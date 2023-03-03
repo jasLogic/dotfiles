@@ -1,45 +1,15 @@
-;;; init.el --- init file
-;;; Commentary:
-;;; Code:
-
 ;;; increase gc threshold
 (setq gc-cons-threshold 10000000)
 ;;; garbage collect when losing focus or after being idle for 5s
 (add-function :after after-focus-change-function (lambda () (unless (frame-focus-state) (garbage-collect))))
 (run-with-idle-timer 5 t 'garbage-collect)
 
-;;; make the custom file a temp file so that customizationsa are only temporary
-(setq custom-file (make-temp-file "emacs-custom-file"))
-
 ;;; focus help window when opened
 (setq help-window-select t)
 
 ;;; uniquify buffer names like file system paths
+;;; TODO:
 (setq uniquify-buffer-name-style 'forward)
-
-;;; only ask y or n, not yes or no
-(setq use-short-answers t)
-
-;; melpa
-(require 'package)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-(package-initialize)
-
-;;; use-package
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
-(eval-when-compile (require 'use-package))
-(setq use-package-always-ensure t)
-
-;;; fix $PATH env variable on mac
-(use-package exec-path-from-shell
-  :if (eq system-type 'darwin)
-  :config (exec-path-from-shell-initialize))
-
-;;; tramp
-(setq-default tramp-default-method "ssh")
-(setq-default tramp-terminal-type "dump")
 
 ;;; don't show startup screen
 (setq inhibit-startup-message t)
@@ -51,419 +21,512 @@
 ;;; disable menubar
 (menu-bar-mode -1)
 
-;;; fullscreen with [F11]
-(global-set-key [f11] 'toggle-frame-fullscreen)
-
 ;; right alt as normal alt on darwin
 (when (eq system-type 'darwin)
   (setq ns-right-alternate-modifier 'none))
 
-;;; move on logical lines instead of visual lines (except for text-mode, see below)
-(require 'simple)
-(setq line-move-visual nil)
+(setq tab-always-indent 'complete)
+
+(when (member "DejaVuSansMono Nerd Font Mono" (font-family-list))
+  (set-face-attribute 'default nil :font "DejaVuSansMono Nerd Font Mono-12")
+  (set-frame-font "DejaVuSansMono Nerd Font Mono-12" t t))
+
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+      (bootstrap-version 6))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
+
+(setq straight-use-package-by-default t)
+
+(straight-use-package 'use-package)
+
+;;; random stuff not associated to a package
+(use-package emacs
+  :straight (:type built-in)
+  :custom
+  (custom-file (make-temp-file "emacs-custom-file")) ; make customizations temporary
+  (fill-column 120)
+  (indent-tabs-mode nil) ; don't use tabs to indent
+  (tab-width 4)
+  (minibuffer-prompt-properties ; do not allow the cursor in the minibuffer prompt
+   '(read-only t cursor-intangible t face minibuffer-prompt))
+  ;;(native-comp-async-report-warnings-errors 'silent)
+  (sentence-end-double-space nil)
+  (use-short-answers t) ; only ask y or n, not yes or no
+  (user-full-name "Jaslo Ziska")
+  (user-mail-address "jaslo@jaslogic.tech")
+  (warning-minimum-level :error)
+  :config
+  (add-hook #'before-save-hook #'delete-trailing-whitespace) ; delete trailing whitespace on save
+  (add-hook #'minibuffer-setup-hook #'cursor-intangible-mode) ; keep cursor out of cursor-intangible areas
+  (global-display-line-numbers-mode 1))
+
+;;; built-in packages:
+(use-package bibtex
+  :straight (:type built-in)
+  :custom (bibtex-align-at-equal-sign t))
+
+(use-package calendar
+  :straight (:type built-in)
+  :config (calendar-set-date-style 'european))
+
+(use-package dired
+  :straight (:type built-in)
+  :custom
+  (dired-listing-switches "-l --almost-all --human-readable --si --group-directories-first")
+  (dired-auto-revert-buffer t)
+  (dired-kill-when-opening-new-dired-buffer t))
+
+(use-package eldoc
+  :straight (:type built-in)
+  :custom
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-echo-area-use-multiline-p 5))
+
+(use-package flyspell
+  :custom-face
+  ;; make flyspell-incorrect face only underline in red (moe default is red background)
+  (flyspell-incorrect ((t (:foreground unspecified :background unspecified :underline "#ef2929")))))
+
+(use-package hl-line
+  :straight (:type built-in)
+  :init (global-hl-line-mode 1))
+
+(use-package image
+  :straight (:type built-in)
+  :init (add-hook 'image-mode-hook (lambda ()
+                                     (auto-revert-mode 1)
+                                     (display-line-numbers-mode -1) ; no line numbers
+                                     (blink-cursor-mode -1))) ; disable cursor blinking
+  :custom (image-use-external-converter t))
+
+(use-package project
+  :straight (:type built-in)
+  :custom (project-vc-ignores '("./build/" "./target/" ".cache/"))
+  :config (add-to-list 'project-switch-commands '(magit-project-status "Magit" ?m)))
+
+(use-package re-builder
+  :straight (:type built-in)
+  :commands re-builder
+  :bind ("C-c r" . re-builder)
+  :custom (reb-re-syntax 'rx))
+
+(use-package savehist
+  :straight (:type built-in)
+  :init (savehist-mode))
+
+(use-package simple
+  :straight (:type built-in)
+  :custom (line-move-visual nil) ; move on logical lines instead of visual lines (except for text-mode, see below)
+  :config (column-number-mode))
 
 ;;; wrap lines nicely in text modes and move on visual lines
-(add-hook 'text-mode-hook (lambda ()
-                            (visual-line-mode 1)
-                            (setq-local line-move-visual t)))
+(use-package text-mode
+  :straight (:type built-in)
+  :init
+  (add-hook 'text-mode-hook (lambda ()
+                              (visual-line-mode 1)
+                              (setq-local line-move-visual t))))
 
-;;; fill-column
-(setq-default fill-column 120)
+(use-package tramp
+  :straight (:type built-in)
+  :custom
+  (tramp-default-method "ssh")
+  :config (setq tramp-terminal-type "dump")) ; I don't know why but I need to set it to this value, otherwise it does not work...
 
-;;; show line numbers
-(global-display-line-numbers-mode 1)
+(use-package vc-hooks
+  :straight (:type built-in)
+  :custom (vc-follow-symlinks t))
 
-;;; highlight current line
-(global-hl-line-mode 1)
+;;; TODO: trailing whitespace not working?
+(use-package whitespace
+  :straight (:type built-in)
+  :hook prog-mode
+  :custom
+  (whitespace-line-column fill-column)
+  (whitespace-style '(face trailing tabs lines-trail empty)))
 
-;;; tabs
-(setq-default tab-width 4)
-(setq-default indent-tabs-mode nil)
+(use-package windmove
+  :straight (:type built-in)
+  :commands (windmove-left windmove-down windmove-up windmove-right)
+  :init (defvar-keymap windmove-hjkl-map)
+  :bind (:map windmove-hjkl-map
+              ("h" . windmove-left)
+              ("j" . windmove-down)
+              ("k" . windmove-up)
+              ("l" . windmove-right)
+              ("q" . delete-window)
+              ("v" . split-window-below)
+              ("s" . split-window-right)))
 
-;;; delete trailing whitespace when saving a file
-(add-hook 'before-save-hook 'delete-trailing-whitespace)
-
-;;; highlight useless whitespace (in programming modes)
-(require 'whitespace)
-(setq whitespace-line-column fill-column)
-(setq whitespace-style '(face trailing tabs lines-tail empty))
-(add-hook 'prog-mode-hook 'whitespace-mode)
-
-;;; set font
-(add-to-list 'default-frame-alist '(font . "DejaVuSansMono Nerd Font Mono-12"))
-;(add-to-list 'default-frame-alist '(font . "DejaVuSansMono Nerd Font Mono-9"))
-
-(require 're-builder)
-(setq reb-re-syntax 'string)
-
-(require 'vc-hooks)
-(setq vc-follow-symlinks t)
-
-(use-package monokai-theme
-  :config
-  (load-theme 'monokai t))
-
+;;; external non-prog-mode packages:
 (use-package all-the-icons)
+(use-package all-the-icons-dired
+  :hook dired-mode)
 
-;;; configure mode-line
-;;; nyan-mode (very important)
-(use-package nyan-mode
-  :commands nyan-create
+(use-package consult
+  :bind (("C-x b" . consult-buffer)
+         ("C-s" . consult-line)
+         ("C-c g" . consult-ripgrep)
+         ("C-c m" . consult-man)
+         :map project-prefix-map
+         ("b" . consult-project-buffer)
+         ("C-b" . consult-project-buffer)
+         :map goto-map
+         ("g" . consult-goto-line)))
+
+(use-package corfu
+  :init (global-corfu-mode 1)
+  :bind (:map corfu-map
+              ("SPC" . corfu-insert-separator)
+              ("C-j" . corfu-next)
+              ("C-k" . corfu-previous))
   :custom
-  (nyan-animate-nyancat t)
-  (nyan-wavy-trail t)
-  (nyan-bar-length 64))
-
-(defvar-local mode-line-directory nil
-  "Cache the directory for the mode line as the call to determine the directory is pretty expensive,
-especially when using tramp.")
-
-(defun mode-line-directory ()
-  "Get the directory path.
-If the current buffer is not a file just print the `default-directory'.
-If it is a file print the relative path inside the projectile project or its complete path."
-  (if buffer-file-name
-      (if mode-line-directory
-          mode-line-directory
-        (let ((root (projectile-project-root)))
-          (if root
-              (setq mode-line-directory
-                    (concat
-                     (projectile-project-name root)
-                     "/"
-                     (if (not (file-equal-p default-directory root))
-                         (file-relative-name default-directory root))))
-            (setq mode-line-directory default-directory))))))
-
-(defun mode-line-buffer-name ()
-  "Get the name of the buffer without the uniquifying for buffers with the same name."
-    (if buffer-file-name
-        (file-name-nondirectory buffer-file-name)
-      (buffer-name)))
-
-;;; inspired by: https://amitp.blogspot.com/2011/08/emacs-custom-mode-line.html
-(setq-default mode-line-format
-              (list mode-line-front-space
-                    ;; line number
-                    "(%l:"
-                    ;; column number (will be highlighted when greater than fill-column)
-                    '(:eval (propertize "%3C" 'face
-                                        (if (and (bound-and-true-p whitespace-mode) (>= (current-column) fill-column))
-                                            'mode-line-fill-column-face)))
-                    ") "
-                    ;; RO if the buffer is read-only
-                    '(:eval (if buffer-read-only
-                                (propertize "RO " 'face 'mode-line-read-only-face)))
-                    ;; @ if the file is remote
-                    '(:eval (if (and buffer-file-name (file-remote-p buffer-file-name))
-                                (propertize "@ " 'face 'mode-line-emphasis)))
-                    ;; path to the buffer
-                    '(:eval (mode-line-directory))
-                    ;; buffer name
-                    '(:eval (propertize (mode-line-buffer-name) 'face 'mode-line-buffer-id))
-                    ;; add a asterik (*) if the buffer is modified and not saved
-                    '(:eval (if (buffer-modified-p)
-                                "* "
-                              "  "))
-                    ;; major mode
-                    ;;'(:propertize "(%m) " face mode-line-emphasis)
-                    '(:eval (all-the-icons-icon-for-buffer))
-                    ;; version control info
-                    '(vc-mode vc-mode)
-                    " "
-                    ;; miscellaneous
-                    '(global-mode-string global-mode-string)
-                    ;; percentage of position in buffer
-                    " %p "
-                    ;; nyan
-                    '(:eval (list (nyan-create)))
-                    mode-line-end-spaces))
-
-;;; custom faces
-(make-face 'mode-line-read-only-face)
-(make-face 'mode-line-fill-column-face)
-
-(set-face-attribute 'mode-line nil
-                    :foreground "gray60" :background "gray20"
-                    :box '(:line-width 6 :color "gray20" :style nil))
-(set-face-attribute 'mode-line-inactive nil
-                    :foreground "gray60" :background "gray50"
-                    :box '(:line-width 6 :color "gray50" :style nil))
-(set-face-attribute 'mode-line-emphasis nil
-                    :foreground "gray80"
-                    :weight 'bold)
-(set-face-attribute 'mode-line-buffer-id nil
-                    :foreground "#eab700"
-                    :weight 'bold)
-
-(set-face-attribute 'mode-line-read-only-face nil
-                    :foreground "red3"
-                    :weight 'bold)
-(set-face-attribute 'mode-line-fill-column-face nil
-                    :foreground "magenta")
-
-(use-package dashboard
-  :custom
-  (dashboard-startup-banner 'logo)
-  (dashboard-projects-backend 'projectile)
-  (dashboard-items '((recents . 10)
-                     (projects . 5)
-                     (agenda . 5)))
+  (corfu-auto t)
+  (corfu-auto-delay 1)
+  (corfu-auto-prefix 3)
+  (corfu-cycle t)
+  (corfu-echo-documentation t)
   :config
-  (dashboard-setup-startup-hook))
+  (defun corfu-enable-always-in-minibuffer ()
+    "Enable Corfu in the minibuffer if Vertico is not active."
+    (unless (bound-and-true-p vertico--input)
+      (corfu-mode 1)
+      (setq-local corfu-echo-documentation nil))) ; don't show doc while we are typing there
+  (add-hook 'minibuffer-setup-hook #'corfu-enable-always-in-minibuffer 1))
+
+(use-package dwim-shell-command)
+
+(use-package eglot
+  :commands eglot
+  :hook (LaTeX-mode . eglot-ensure)
+  :bind (("C-c l n" . flymake-goto-next-error)
+         ("C-c l p" . flymake-goto-prev-error)
+         ("C-c l r" . eglot-rename)
+         ("C-c l f" . eglot-format)
+         ("C-c l a" . eglot-code-actions)))
+
+;;; fix $PATH env variable on mac
+(use-package exec-path-from-shell
+  :if (eq system-type 'darwin)
+  :config (exec-path-from-shell-initialize))
+
+;;; highlight TODO, FIXME, ... (in programming modes)
+(use-package hl-todo
+  :hook (prog-mode . hl-todo-mode))
+
+(use-package kind-icon
+  :after corfu
+  :custom
+  (kind-icon-default-face 'corfu-default) ; to compute blended backgrounds correctly
+  (kind-icon-default-style '(:padding 0 :stroke 0 :margin 0 :radius 0 :height 0.6 :scale 1.0))
+  :config
+  (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
+
+(use-package magit
+  :commands (magit-status magit-file-dispatch)
+  :bind (("C-x g" . magit-status)
+         ("C-c g" . magit-file-dispatch)))
+
+(use-package magit-todos
+  ;; fix meow not working inside magit (because of keymap property in magit-insert-section)
+  :bind (:map magit-todos-section-map
+         ("j" . nil)
+         :map magit-todos-item-section-map
+         ("j" . nil))
+  :config (magit-todos-mode))
+
+(use-package meow
+  :custom
+  (meow-cheatsheet-layout meow-cheatsheet-layout-qwerty)
+  (meow-goto-line-function #'consult-goto-line)
+  (meow-use-clipboard t)
+  (meow-use-cursor-position-hack t)
+  :config
+  (when (not (assoc ?a meow-char-thing-table))
+    (push '(?a . angle) meow-char-thing-table))
+  (meow-thing-register 'angle '(pair ("<") (">")) '(pair ("<") (">")))
+  (when (not (assoc ?$ meow-char-thing-table))
+    (push '(?$ . dollar) meow-char-thing-table))
+  (meow-thing-register 'dollar '(regexp "\\$" "\\$") '(regexp "\\$" "\\$"))
+  (meow-motion-overwrite-define-key
+   '("j" . meow-next)
+   '("k" . meow-prev)
+   '("<escape>" . ignore))
+  (meow-leader-define-key
+   ;; SPC j/k will run the original command in MOTION state.
+   '("j" . "H-j")
+   '("k" . "H-k")
+   ;; Use SPC (0-9) for digit arguments.
+   '("1" . meow-digit-argument)
+   '("2" . meow-digit-argument)
+   '("3" . meow-digit-argument)
+   '("4" . meow-digit-argument)
+   '("5" . meow-digit-argument)
+   '("6" . meow-digit-argument)
+   '("7" . meow-digit-argument)
+   '("8" . meow-digit-argument)
+   '("9" . meow-digit-argument)
+   '("0" . meow-digit-argument)
+   '("/" . meow-keypad-describe-key)
+   '("?" . meow-cheatsheet)
+   '("b" . consult-buffer)
+   '("B" . list-buffers)
+   (cons "p" project-prefix-map)
+   '("v" . magit-status)
+   '("V" . magit-file-dispatch)
+   (cons "w" windmove-hjkl-map))
+  (meow-normal-define-key
+   '("0" . meow-expand-0)
+   '("9" . meow-expand-9)
+   '("8" . meow-expand-8)
+   '("7" . meow-expand-7)
+   '("6" . meow-expand-6)
+   '("5" . meow-expand-5)
+   '("4" . meow-expand-4)
+   '("3" . meow-expand-3)
+   '("2" . meow-expand-2)
+   '("1" . meow-expand-1)
+   '("=" . meow-indent)
+   '("-" . negative-argument)
+   '(";" . meow-reverse)
+   '(":" . meow-goto-line)
+   '("," . meow-inner-of-thing)
+   '("." . meow-bounds-of-thing)
+   '("[" . meow-beginning-of-thing)
+   '("]" . meow-end-of-thing)
+   '("a" . meow-append)
+   '("A" . (lambda () (interactive) (move-end-of-line nil) (meow-insert)))
+   '("b" . meow-back-word)
+   '("B" . meow-back-symbol)
+   '("c" . meow-change)
+   '("d" . (lambda () (interactive) (if (region-active-p) (meow-kill) (meow-delete))))
+   '("D" . meow-backward-delete)
+   '("e" . meow-next-word)
+   '("E" . meow-next-symbol)
+   '("f" . meow-find)
+   '("g" . meow-cancel-selection)
+   '("G" . meow-grab)
+   '("h" . meow-left)
+   '("H" . meow-left-expand)
+   '("i" . meow-insert)
+   '("I" . (lambda () (interactive) (back-to-indentation) (meow-insert)))
+   '("j" . meow-next)
+   '("J" . meow-next-expand)
+   '("k" . meow-prev)
+   '("K" . meow-prev-expand)
+   '("l" . meow-right)
+   '("L" . meow-right-expand)
+   '("m" . meow-join)
+   '("n" . meow-search)
+   '("o" . meow-open-below)
+   '("O" . meow-open-above)
+   '("p" . meow-yank)
+   '("P" . consult-yank-from-kill-ring)
+   '("q" . quit-window)
+   '("Q" . kill-buffer)
+   '("r" . meow-replace)
+   '("R" . meow-swap-grab)
+   '("s" . meow-block)
+   '("S" . meow-to-block)
+   '("t" . meow-till)
+   '("u" . meow-undo)
+   '("U" . meow-undo-in-selection)
+   '("v" . meow-visit)
+   '("w" . meow-mark-word)
+   '("W" . meow-mark-symbol)
+   '("x" . meow-line)
+   '("X" . meow-goto-line)
+   '("y" . meow-save)
+   '("Y" . meow-sync-grab)
+   '("z" . meow-pop-selection)
+   '("'" . repeat)
+   '("<escape>" . ignore))
+  (meow-global-mode 1))
+
+(use-package moe-theme
+  :config (load-theme 'moe-dark t))
+
+(use-package multi-vterm
+  :after vterm
+  :commands multi-vterm
+  :bind ("C-x t" . multi-vterm))
 
 (use-package no-littering
   :config
   ;; also place auto save file into var directory
   (setq auto-save-file-name-transforms `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
 
-(setq backup-by-copying t
-      version-control t
-      delete-old-versions t
-      kept-new-versions 6
-      kept-old-versions 2)
-
-;;; show key binding completions
-(use-package which-key
-  :hook (after-init . which-key-mode))
-
-;;; ace-window
-(use-package ace-window
-  :bind ([remap other-window] . ace-window))
-
-;;; ivy
-(use-package ivy
+;;; https://emacs.stackexchange.com/questions/13314/install-pdf-tools-on-emacs-macosx
+(use-package pdf-tools
+  :mode "\\.pdf\\'"
+  :magic-fallback "%PDF"
   :config
-  (setq ivy-initial-inputs-alist
-        (cons '(execute-extended-command . "^") ivy-initial-inputs-alist))
-  (ivy-mode 1))
-
-;;; ivy-rich
-(use-package ivy-rich
-  :config
-  (ivy-rich-mode 1)
-  (ivy-rich-project-root-cache-mode 1)
-  (setcdr (assq t ivy-format-functions-alist) #'ivy-format-function-line))
-
-;;; counsel
-(use-package counsel
-  :bind (([remap find-file] . counsel-find-file)
-         ([remap execute-extended-command] . counsel-M-x)
-         ([remap describe-function] . counsel-describe-function)
-         ([remap describe-variable] . counsel-describe-variable)
-         :map counsel-find-file-map
-         ("RET" . ivy-alt-done)))
-
-;;; swiper (better search using ivy)
-(use-package swiper
-  :after ivy
-  :bind (("C-s" . swiper-isearch)
-         ("C-r" . swiper-isearch-backward)))
-
-;;; highlight TODO, FIXME, ... (in programming modes)
-(use-package hl-todo
-  :hook (prog-mode . hl-todo-mode))
-
-;;; parenthesis
-(use-package smartparens
-  :hook (prog-mode . smartparens-mode)
-  :config
-  (require 'smartparens-config)
-  (add-hook 'prog-mode-hook 'show-smartparens-mode))
+  (when (eq system-type 'darwin)
+    (setq pdf-tools-handle-upgrades nil)
+    (setq pdf-info-epdfinfo-program "/usr/local/bin/epdfinfo"))
+  (add-hook 'pdf-view-mode-hook (lambda ()
+                                  (display-line-numbers-mode -1) ; no line numbers
+                                  (blink-cursor-mode -1))) ; disable cursor blinking
+  (pdf-tools-install :no-query)
+  :bind (:map pdf-view-mode-map ("C-s" . isearch-forward))) ; use pdf-tool specific search
 
 (use-package rainbow-delimiters
-  :hook (prog-mode . rainbow-delimiters-mode))
-
-;;; from emacs redux: https://emacsredux.com/blog/2013/05/22/smarter-navigation-to-the-beginning-of-a-line/
-(defun smarter-move-beginning-of-line (arg)
-  "Move point back to indentation of beginning of line.
-
-Move point to the first non-whitespace character on this line.
-If point is already there, move to the beginning of the line.
-Effectively toggle between the first non-whitespace character and
-the beginning of the line.
-
-If ARG is not nil or 1, move forward ARG - 1 lines first.  If
-point reaches the beginning or end of the buffer, stop there."
-  (interactive "^p")
-  (setq arg (or arg 1))
-
-  ;; Move lines first
-  (when (/= arg 1)
-    (let ((line-move-visual nil))
-      (forward-line (1- arg))))
-
-  (let ((orig-point (point)))
-    (back-to-indentation)
-    (when (= orig-point (point))
-      (move-beginning-of-line 1))))
-
-;;; remap C-a to `smarter-move-beginning-of-line'
-(when (boundp 'visual-line-mode)
-  (define-key visual-line-mode-map [remap move-beginning-of-line] #'smarter-move-beginning-of-line))
-(global-set-key [remap move-beginning-of-line] #'smarter-move-beginning-of-line)
-
-
-(require 'dired)
-;;; don't create a new buffer when pressing RET (or e or f)
-(setq dired-kill-when-opening-new-dired-buffer t)
-;;; automatically revert dired buffers
-(setq dired-auto-revert-buffer t)
-;;; enable enter key
-(put 'dired-find-alternate-file 'disabled nil)
+  :hook prog-mode)
 
 (use-package vterm
-  :commands (vterm)
-  :bind ("C-x t" . vterm)
   ;; disable line highlight: https://github.com/akermu/emacs-libvterm/issues/432#issuecomment-894230991
   :hook ((vterm-mode . (lambda () (setq-local global-hl-line-mode nil)))
          (vterm-copy-mode . (lambda () (hl-line-mode 'toggle))))
   :custom (vterm-buffer-name-string "vterm: %s")
   :config (set-face-attribute 'vterm-color-yellow nil :foreground "dark orange" :background "orange"))
 
-(use-package tex
-  :ensure auctex)
+(use-package which-key
+  :hook (after-init . which-key-mode))
 
-;;; pdf-tools
-;;; https://emacs.stackexchange.com/questions/13314/install-pdf-tools-on-emacs-macosx
-(use-package pdf-tools
-  :mode "\\.pdf\\'"
-  :config
-  (when (eq system-type 'darwin)
-    (setq pdf-tools-handle-upgrades nil)
-    (setq pdf-info-epdfinfo-program "/usr/local/bin/epdfinfo"))
-  (add-hook 'pdf-view-mode-hook (lambda () (display-line-numbers-mode -1))) ; no line numbers
-  (pdf-tools-install)
-  :bind (:map pdf-view-mode-map ("C-s" . isearch-forward))) ; use pdf-tool specific search
+;;; minibuffer:
+(use-package all-the-icons-completion
+  :after (marginalia all-the-icons)
+  :hook (marginalia-mode . all-the-icons-completion-marginalia-setup)
+  :init
+  (all-the-icons-completion-mode))
 
-;;; man
-(require 'man)
-(global-set-key (kbd "C-c m") 'man)
-(setq Man-switches "-a")
+(use-package marginalia
+  :init (marginalia-mode))
 
-;;; magit
-(use-package magit
-  :bind (("C-x g" . magit-status)
-         ("C-c g" . magit-file-dispatch)))
-
-;;; projectile
-(use-package projectile
-  :commands (projectile-project-root projectile-project-name)
-  :init (projectile-mode 1)
-  :bind-keymap ("C-c p" . projectile-command-map)
+(use-package orderless
   :custom
-  (projectile-completion-system 'ivy "Use ivy for projectile completions")
-  (projectile-enable-caching t "Enable caching for better performance")
-  (projectile-indexing-method 'hybrid)
-  :config
-  (setq projectile-globally-ignored-directories (cons "build" projectile-globally-ignored-directories)))
+  (completion-styles '(orderless basic))
+  (completion-category-defaults nil)
+  (completion-category-overrides '((file (styles basic orderless)))))
 
-;;; eglot (lsp)
-(use-package eglot)
+(use-package vertico
+  :bind (:map vertico-map
+              ("S-C-J" . vertico-next-group)
+              ("S-C-K" . vertico-previous-group)
+              ("C-j" . vertico-next)
+              ("C-k" . vertico-previous)
+              ("~" . (lambda ()
+                       (interactive)
+                       (beginning-of-line nil)
+                       (kill-line)
+                       (insert "~/")))
+              ("DEL" . (lambda () ; delete the whole directory when completing a filename and the last character is '/'
+                         (interactive)
+                         (if (and minibuffer-completing-file-name (eq ?/ (char-before (point))))
+                             (progn ; TODO: error when // or at ~/
+                               (delete-backward-char 1)
+                               (unless (zerop (skip-chars-backward "^/"))
+                                 (kill-line)))
+                           (delete-backward-char 1)))))
+  :init (vertico-mode)
+  :custom (vertico-cycle t))
 
-(define-key eglot-mode-map (kbd "C-c l n") #'flymake-goto-next-error)
-(define-key eglot-mode-map (kbd "C-c l p") #'flymake-goto-prev-error)
-(define-key eglot-mode-map (kbd "C-c l r") #'eglot-rename)
-(define-key eglot-mode-map (kbd "C-c l f") #'eglot-format)
-(define-key eglot-mode-map (kbd "C-c l a") #'eglot-code-actions)
-
-(require 'eldoc)
-(setq eldoc-echo-area-prefer-doc-buffer t)
-(setq eldoc-echo-area-use-multiline-p 5)
-(setq eldoc-echo-area-display-truncation-message nil)
-
-;;; yasnippet (for completions)
 (use-package yasnippet
-  :hook (prog-mode . yas-minor-mode))
+  :hook ((LaTeX-mode . yas-minor-mode)))
 
-;;; completions
-(use-package company
-  :hook (prog-mode . company-mode))
+;; Enable recursive minibuffers
+(setq enable-recursive-minibuffers t)
 
-;; language specific
-
-;;; c
-(require 'cc-mode)
-(setq c-basic-offset 4)
-(setq c-backslash-column 79)
-(setq c-backslash-max-column (1- fill-column))
-
-;;; cmake
-(use-package cmake-mode
-  :mode ("CMakeLists\\.txt\\'" "\\.cmake\\'"))
-
-;;; cuda
-(use-package c++-mode
-  :ensure nil
-  :mode ("\\.cu\\'" "\\.cuh\\'"))
-
-;;; geiser (for scheme)
-(use-package geiser)
-
-;;; go
-;;; use spaces instead of tabs with go mode
-(use-package go-mode
-  :mode "\\.go\\'"
+;; org-mode config
+(use-package org
+  :straight (:type built-in)
   :config
-  (add-hook 'go-mode-hook
-            (lambda ()
-              (setq indent-tabs-mode nil))))
-
-;;; jupyter notebook
-(use-package ein
-  :custom (ein:output-area-inlined-images t))
-
-;;; lua
-(use-package lua-mode
-  :mode "\\.lua\\'"
-  :custom (lua-indent-level 4))
-
-;;; rust
-(use-package rustic
-  :config (add-hook 'before-save-hook (lambda () (when (eq major-mode 'rustic-mode)
-                                                   (eglot-format-buffer))))
+  (plist-put org-format-latex-options :scale 2.0)
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((C . t)
+     (emacs-lisp . t)
+     (latex . t)
+     (python . t)
+     (screen . t)
+     (shell . t)))
+  (add-hook 'org-babel-after-execute-hook 'org-redisplay-inline-images) ; redisplay images after running code
   :custom
-  (rustic-lsp-client 'eglot))
+  (org-confirm-babel-evaluate nil) ; don't ask before evaluating a code block
+  (org-edit-src-content-indentation 0)
+  (org-ellipsis " ▾")
+  (org-fold-catch-invisible-edits 'show-and-error)
+  (org-image-actual-width 500)
+  (org-startup-with-inline-images t)
+  (org-startup-with-latex-preview t)
+  ;; LaTeX
+  (org-latex-packages-alist
+   '(("AUTO" "babel" nil)
+     ("per-mode=fraction" "siunitx" t) ; scientific units
+     ("" "physics" t)))) ; abs, norm, braket, ...
 
-(use-package yaml-mode
-  :mode "\\.yml\\'")
-
-;;; org
-(require 'org)
-
-(setq org-ellipsis " ▾")
-(plist-put org-format-latex-options :scale 2.0)
-
-(require 'ox-latex)
-
-(org-babel-do-load-languages
- 'org-babel-load-languages
- '((C . t)
-   (emacs-lisp . t)
-   (latex . t)
-   (python . t)
-   (screen . t)
-   (shell . t)))
-
-(setq org-latex-packages-alist
-      '(("AUTO" "babel" nil) ; automatically use correct language in export
-        ("per-mode=fraction" "siunitx" t) ; scientific units
-        ;("" "braket" t)
-        ("" "physics" t)))
-
-(setq org-startup-with-inline-images t)
-(setq org-startup-with-latex-preview t)
-(add-hook 'org-babel-after-execute-hook 'org-redisplay-inline-images) ; redisplay images after running
-(setq org-confirm-babel-evaluate nil) ; don't ask before evaluating a code block
-(setq org-latex-caption-above nil) ; place caption below every element
-(setq org-image-actual-width 600) ; width of inline images in px
-
-;;; org-roam
 (use-package org-roam
-  :custom (org-roam-directory "~/org-roam")
   :bind (("C-c n f" . org-roam-node-find)
-         ("C-c n i" . org-roam-node-insert))
+	 ("C-c n i" . org-roam-node-insert))
+  :custom
+  (org-roam-directory "~/org-roam")
+  (org-roam-capture-templates
+   '(("d" "default" plain "%?"
+      :target (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}")
+      :unnarrowed t)
+     ("q" "Quantum")
+     ("qm" "Quantum Mechanics" plain "%?"
+      :target (file+head "physics/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: :Physics:QM:")
+      :unnarrowed t)
+     ("g" "Gardening" plain "%?"
+      :target (file+head "gardening/%<%Y%m%d%H%M%S>-${sluf}.org" "#+title: ${title}\n#+filetags: :Gardening:")
+      :unnarrowed t)))
+  (org-roam-node-display-template
+   (concat "${title:*} " (propertize "${tags:20}" 'face 'org-tag)))
   :config (org-roam-db-autosync-mode))
 
-(provide 'init)
-;;; init.el ends here
+(use-package htmlize)
+
+;;; language specific
+; TODO: maybe with (use-package auctex :mode ((...) . TeX-latex-mode)) ??
+(use-package latex
+  :straight auctex
+  :mode (rx ".tex" eos)
+  :custom
+  (TeX-auto-save t)
+  (TeX-engine 'xetex)
+  (TeX-master nil)
+  (TeX-parse-self t)
+  (LaTeX-csquotes-open-quote "\\enquote{")
+  (LaTeX-csquotes-close-quote "}")
+  :config
+  (setf (car (alist-get 'output-pdf TeX-view-program-selection)) "PDF Tools") ; use pdf-tools as pdf viewer
+  (put 'LaTeX-mode 'flyspell-mode-predicate 'tex-mode-flyspell-verify) ; don't flyspell on LaTeX macros
+  (add-hook 'TeX-language-ngerman-hook (lambda () (ispell-change-dictionary "de_DE")))
+  (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer)) ; revert pdf buffer when finished compiling
+
+(use-package cc-mode
+  :straight (:type built-in)
+  :custom
+  (c-basic-offset 4)
+  (c-backslash-column 79)
+  (c-backslash-max-column (1- fill-column)))
+
+(use-package cmake-mode)
+
+(use-package c++-mode
+  :straight (:type built-in)
+  :mode (rx ".cu" (opt "h") eos)) ; for CUDA
+
+(use-package dockerfile-mode)
+
+(use-package dts-mode)
+
+(use-package lua-mode
+  :custom (lua-indent-level 4))
+
+(use-package pyvenv)
+
+(use-package rust-mode)
+
+(use-package yaml-mode
+  :mode (rx ".y" (opt "a") "ml" eos))

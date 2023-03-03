@@ -50,9 +50,9 @@ colors:
       foreground: CellBackground
       background: '#86C30D'
 
-    bar:
-      background: '#3C3D37'
-      foreground: '#F8F8F2'
+  footer_bar:
+    background: '#3C3D37'
+    foreground: '#F8F8F2'
 
   line_indicator:
     foreground: '#8F908A'
