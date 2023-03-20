@@ -53,7 +53,10 @@
   :straight (:type built-in)
   :custom
   (custom-file (make-temp-file "emacs-custom-file")) ; make customizations temporary
+  (delete-by-moving-to-trash t)
+  (display-line-numbers-width 3) ; min. 3 characters in line numbers column
   (fill-column 120)
+  (history-length 25)
   (indent-tabs-mode nil) ; don't use tabs to indent
   (tab-width 4)
   (minibuffer-prompt-properties ; do not allow the cursor in the minibuffer prompt
@@ -119,8 +122,15 @@
   :bind ("C-c r" . re-builder)
   :custom (reb-re-syntax 'rx))
 
+(use-package recentf
+  :straight (:type built-in)
+  :after (no-littering)
+  :init (recentf-mode))
+
 (use-package savehist
   :straight (:type built-in)
+  :after (no-littering)
+  :custom (savehist-additional-variables '(command-history kill-ring))
   :init (savehist-mode))
 
 (use-package simple
@@ -234,7 +244,10 @@
 (use-package magit
   :commands (magit-status magit-file-dispatch)
   :bind (("C-x g" . magit-status)
-         ("C-c g" . magit-file-dispatch)))
+         ("C-c g" . magit-file-dispatch))
+  :custom
+  (magit-diff-refine-ignore-whitespace nil)
+  (magit-diff-refine-hunk 'all))
 
 (use-package magit-todos
   ;; fix meow not working inside magit (because of keymap property in magit-insert-section)
@@ -392,6 +405,9 @@
 (use-package which-key
   :hook (after-init . which-key-mode))
 
+(use-package yasnippet
+  :hook ((LaTeX-mode . yas-minor-mode)))
+
 ;;; minibuffer:
 (use-package all-the-icons-completion
   :after (marginalia all-the-icons)
@@ -429,9 +445,6 @@
                            (delete-backward-char 1)))))
   :init (vertico-mode)
   :custom (vertico-cycle t))
-
-(use-package yasnippet
-  :hook ((LaTeX-mode . yas-minor-mode)))
 
 ;; Enable recursive minibuffers
 (setq enable-recursive-minibuffers t)
