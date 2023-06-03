@@ -1,0 +1,13 @@
+allow_images=true
+image_size=48
+insensitive=true
+lines=8
+location=top
+no_actions=true
+prompt=Search
+show=drun
+yoffset=500
+
+key_expand=Tab
+key_down=Control_L-j
+key_up=Control_L-k

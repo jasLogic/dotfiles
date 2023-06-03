@@ -5,7 +5,10 @@
 The dotfiles are managed with [[https://www.gnu.org/software/stow/][GNU Stow]].
 
 #+BEGIN_SRC sh
-  stow emacs
-  stow zsh
   stow alacritty
+  stow emacs
+  stow sway
+  stow waybar
+  stow wofi
+  stow zsh
 #+END_SRC

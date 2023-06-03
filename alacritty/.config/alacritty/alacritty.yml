@@ -23,10 +23,10 @@ scrolling:
 font:
   normal:
     # Font family
-    family: 'DejaVuSansMono Nerd Font Mono'
+    family: 'DejaVuSansM Nerd Font'
 
   # Point size
-  size: 12.0
+  size: 16.0
 
 # Colors: Monokai, copied from https://github.com/oneKelvinSmith/monokai-emacs/blob/master/monokai-theme.el
 colors:

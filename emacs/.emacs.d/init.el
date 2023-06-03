@@ -27,10 +27,11 @@
 
 (setq tab-always-indent 'complete)
 
-(when (member "DejaVuSansMono Nerd Font Mono" (font-family-list))
-  (set-face-attribute 'default nil :font "DejaVuSansMono Nerd Font Mono-12")
-  (set-frame-font "DejaVuSansMono Nerd Font Mono-12" t t))
+(when (member "DejaVuSansM Nerd Font" (font-family-list))
+  (set-face-attribute 'default nil :font "DejaVuSansM Nerd Font-12")
+  (set-frame-font "DejaVuSansM Nerd Font" t t))
 
+(setq native-comp-deferred-compilation-deny-list nil)
 (defvar bootstrap-version)
 (let ((bootstrap-file
        (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
@@ -72,6 +73,15 @@
   (add-hook #'minibuffer-setup-hook #'cursor-intangible-mode) ; keep cursor out of cursor-intangible areas
   (global-display-line-numbers-mode 1))
 
+;;; load this one early
+(use-package no-littering
+  :config
+  (setq backup-directory-alist `(("^/dev/shm/" . nil) ; don't backup "secret" files: https://lonely.town/@wasamasa/110227701055899570
+                                 ("^/tmp/" . nil)
+                                 ("." . ,(expand-file-name "backup/" no-littering-var-directory))))
+  ;; also place auto save file into var directory
+  (setq auto-save-file-name-transforms `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
+
 ;;; built-in packages:
 (use-package bibtex
   :straight (:type built-in)
@@ -94,7 +104,14 @@
   (eldoc-echo-area-prefer-doc-buffer t)
   (eldoc-echo-area-use-multiline-p 5))
 
+(use-package flymake
+  :straight (:type built-in)
+  :bind (:map flymake-mode-map
+              ("M-j" . flymake-goto-next-error)
+              ("M-k" . flymake-goto-prev-error)))
+
 (use-package flyspell
+  :straight (:type built-in)
   :custom-face
   ;; make flyspell-incorrect face only underline in red (moe default is red background)
   (flyspell-incorrect ((t (:foreground unspecified :background unspecified :underline "#ef2929")))))
@@ -159,7 +176,7 @@
 ;;; TODO: trailing whitespace not working?
 (use-package whitespace
   :straight (:type built-in)
-  :hook prog-mode
+  :hook (prog-mode . whitespace-mode)
   :custom
   (whitespace-line-column fill-column)
   (whitespace-style '(face trailing tabs lines-trail empty)))
@@ -178,9 +195,15 @@
               ("s" . split-window-right)))
 
 ;;; external non-prog-mode packages:
-(use-package all-the-icons)
+(use-package all-the-icons
+  :custom
+  (all-the-icons-faicon-scale-factor 0.8)
+  (all-the-icons-default-faicon-adjust 0.04)
+  (all-the-icons-material-scale-factor 0.8)
+  (all-the-icons-material-faicon-adjust 0.04))
+
 (use-package all-the-icons-dired
-  :hook dired-mode)
+  :hook (dired-mode . all-the-icons-dired-mode))
 
 (use-package consult
   :bind (("C-x b" . consult-buffer)
@@ -217,12 +240,16 @@
 
 (use-package eglot
   :commands eglot
-  :hook (LaTeX-mode . eglot-ensure)
-  :bind (("C-c l n" . flymake-goto-next-error)
-         ("C-c l p" . flymake-goto-prev-error)
-         ("C-c l r" . eglot-rename)
-         ("C-c l f" . eglot-format)
-         ("C-c l a" . eglot-code-actions)))
+  :init (defvar-keymap my/eglot-prefix-map)
+  :hook ((LaTeX-mode . eglot-ensure)
+         ;; run eglot-format when exiting insert mode
+         (meow-insert-exit . (lambda ()
+                               (condition-case nil (eglot-format) (error nil)))))
+  :bind (:map my/eglot-prefix-map
+              ("a" . eglot-code-actions)
+              ("f" . eglot-format)
+              ("r" . eglot-rename))
+  :custom (eglot-ignored-server-capabilities '(:inlayHintProvider)))
 
 ;;; fix $PATH env variable on mac
 (use-package exec-path-from-shell
@@ -243,11 +270,19 @@
 
 (use-package magit
   :commands (magit-status magit-file-dispatch)
-  :bind (("C-x g" . magit-status)
-         ("C-c g" . magit-file-dispatch))
+  :bind (("M-j" . magit-section-forward-sibling)
+         ("M-k" . magit-section-backward-sibling)
+         :map magit-hunk-section-map
+         ("j" . magit-next-line)
+         ("k" . magit-previous-line)
+         ("v" . set-mark-command))
   :custom
   (magit-diff-refine-ignore-whitespace nil)
-  (magit-diff-refine-hunk 'all))
+  (magit-diff-refine-hunk 'all)
+  (git-commit-style-convention-checks '(non-empty-second-line overlong-summary-line))
+  :config
+  (add-hook 'git-commit-setup-hook (lambda () (setq fill-column 72)))
+  (add-hook 'git-commit-setup-hook 'git-commit-turn-on-flyspell))
 
 (use-package magit-todos
   ;; fix meow not working inside magit (because of keymap property in magit-insert-section)
@@ -293,6 +328,8 @@
    '("?" . meow-cheatsheet)
    '("b" . consult-buffer)
    '("B" . list-buffers)
+   '("d" . dired)
+   (cons "l" my/eglot-prefix-map)
    (cons "p" project-prefix-map)
    '("v" . magit-status)
    '("V" . magit-file-dispatch)
@@ -316,6 +353,8 @@
    '("." . meow-bounds-of-thing)
    '("[" . meow-beginning-of-thing)
    '("]" . meow-end-of-thing)
+   '("^" . back-to-indentation)
+   '("$" . move-end-of-line)
    '("a" . meow-append)
    '("A" . (lambda () (interactive) (move-end-of-line nil) (meow-insert)))
    '("b" . meow-back-word)
@@ -344,7 +383,7 @@
    '("O" . meow-open-above)
    '("p" . meow-yank)
    '("P" . consult-yank-from-kill-ring)
-   '("q" . quit-window)
+   '("q" . quit-window) ; TODO: define to meow-quit again when function is changed to use quit-window
    '("Q" . kill-buffer)
    '("r" . meow-replace)
    '("R" . meow-swap-grab)
@@ -373,11 +412,6 @@
   :commands multi-vterm
   :bind ("C-x t" . multi-vterm))
 
-(use-package no-littering
-  :config
-  ;; also place auto save file into var directory
-  (setq auto-save-file-name-transforms `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))))
-
 ;;; https://emacs.stackexchange.com/questions/13314/install-pdf-tools-on-emacs-macosx
 (use-package pdf-tools
   :mode "\\.pdf\\'"
@@ -393,7 +427,7 @@
   :bind (:map pdf-view-mode-map ("C-s" . isearch-forward))) ; use pdf-tool specific search
 
 (use-package rainbow-delimiters
-  :hook prog-mode)
+  :hook (prog-mode . rainbow-delimiters-mode))
 
 (use-package vterm
   ;; disable line highlight: https://github.com/akermu/emacs-libvterm/issues/432#issuecomment-894230991
@@ -430,18 +464,20 @@
               ("S-C-K" . vertico-previous-group)
               ("C-j" . vertico-next)
               ("C-k" . vertico-previous)
-              ("~" . (lambda ()
+              ("~" . (lambda () ; delete current file path and replace with '~/'
                        (interactive)
-                       (beginning-of-line nil)
-                       (kill-line)
-                       (insert "~/")))
+                       (when minibuffer-completing-file-name
+                         (let ((p (point)))
+                           (skip-chars-backward "^:" (line-beginning-position))
+                           (delete-region (point) p))
+                         (insert "~/"))))
               ("DEL" . (lambda () ; delete the whole directory when completing a filename and the last character is '/'
                          (interactive)
                          (if (and minibuffer-completing-file-name (eq ?/ (char-before (point))))
-                             (progn ; TODO: error when // or at ~/
-                               (delete-backward-char 1)
-                               (unless (zerop (skip-chars-backward "^/"))
-                                 (kill-line)))
+                             (let ((p (point)))
+                               (backward-char)
+                               (skip-chars-backward "^/:" (line-beginning-position))
+                               (delete-region (point) p))
                            (delete-backward-char 1)))))
   :init (vertico-mode)
   :custom (vertico-cycle t))

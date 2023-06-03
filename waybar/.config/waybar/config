@@ -1,0 +1,117 @@
+{
+    // "height": 30, // Waybar height (to be removed for auto height)
+    "spacing": 4, // Gaps between modules (4px)
+    // Choose the order of the modules
+    "modules-left": ["sway/workspaces", "sway/mode", "sway/scratchpad", "custom/pacman", "mpris"],
+    "modules-center": ["clock"],
+    "modules-right": ["idle_inhibitor", "pulseaudio", "cpu", "memory", "tray"],
+    // Modules configuration
+    "sway/workspaces": {
+        "disable-scroll": true,
+        "format": "{name}",
+        "persistent_workspaces": {
+            "1": [],
+            "2": [],
+            "3": [],
+            "4": [],
+        }
+    },
+    "sway/mode": {
+        "format": "<span style=\"italic\">{}</span>"
+    },
+    "sway/scratchpad": {
+        "format": "{icon} {count}",
+        "show-empty": false,
+        "format-icons": ["", ""],
+        "tooltip": true,
+        "tooltip-format": "{app}: {title}"
+    },
+    "custom/pacman": {
+        "format": "{icon}  {}",
+        "format-icons": {
+            "pending": "󱑥",
+            "updated": "󰗡"
+        },
+        "interval": 3600,
+        "exec-if": "command -v checkupdates",
+        "exec": "sh $HOME/.config/waybar/modules/updates.sh",
+        "tooltip": true,
+        "return-type": "json",
+        "signal": 8,
+        "on-click": "alacritty -e sudo pacman -Syu; pkill -SIGRTMIN+8 waybar"
+    },
+    "mpris": {
+        "format": "{player_icon} {artist} - {title} {status_icon}",
+        "player-icons": {
+            "default": "♫",
+            "spotify": ""
+        },
+        "status-icons": {
+            "playing": "",
+            "paused": ""
+        },
+        "on-scroll-up": "playerctl previous",
+        "on-scroll-down": "playerctl next",
+    },
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "format-icons": {
+            "activated": "",
+            "deactivated": ""
+        }
+    },
+    "tray": {
+        // "icon-size": 21,
+        "spacing": 10
+    },
+    // TODO: fix when new release
+    "clock": {
+        "locale": "de_DE.UTF-8",
+        "format": "{:󰸗  %a %e. %b %Y    %H:%M}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
+        "calendar": {
+            "mode": "year",
+                  "mode-mon-col"  : 3,
+                    "weeks-pos"     : "right",
+                    "on-scroll"     : 1,
+                    "on-click-right": "mode",
+                    "format": {
+                              "months":     "<span color='#ffead3'><b>{}</b></span>",
+                              "days":       "<span color='#ecc6d9'><b>{}</b></span>",
+                              "weeks":      "<span color='#99ffdd'><b>W{}</b></span>",
+                              "weekdays":   "<span color='#ffcc66'><b>{}</b></span>",
+                              "today":      "<span color='#ff6699'><b><u>{}</u></b></span>"
+                              }
+                    },
+                     "actions":  {
+                    "on-click-right": "mode",
+                    "on-click-forward": "tz_up",
+                    "on-click-backward": "tz_down",
+                    "on-scroll-up": "shift_up",
+                    "on-scroll-down": "shift_down"
+                    }
+    },
+    "cpu": {
+        "format": "  {usage}%",
+    },
+    "memory": {
+        "format": "  {used:.1f}/{total:.1f}"
+    },
+    "pulseaudio": {
+        // "scroll-step": 1, // %, can be a float
+        "format": "{icon}  {volume}%   {format_source}",
+        "format-muted": " {format_source}",
+        "format-source": " {volume}%",
+        "format-source-muted": "",
+        "format-icons": {
+            "headphone": "",
+            "hands-free": "",
+            "headset": "",
+            "phone": "",
+            "portable": "",
+            "car": "",
+            "default": ["", "", ""]
+        },
+        "on-click": "pavucontrol"
+    },
+}
